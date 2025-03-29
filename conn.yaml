@@ -1,0 +1,5 @@
+host: localhost  # Or your database server address
+database: grexchange
+user: postgres
+password: postgres1234
+port: 5432  # Optional, defaults to 5432
