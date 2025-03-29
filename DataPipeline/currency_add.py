@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 # load database connection variables and connect to database
 def connectDB() -> tuple:
-    with open('..\conn.yaml', 'r') as file:
+    with open('../ExchangeRatePipeline/conn.yaml', 'r') as file:
         config = yaml.safe_load(file)
 
         host = config.get('host')

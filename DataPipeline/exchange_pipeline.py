@@ -1,6 +1,5 @@
 import logging
 from datetime import datetime, date
-
 import psycopg2
 import requests
 import yaml
@@ -8,7 +7,7 @@ import yaml
 start_date = date.today()  # date for all requests
 
 # Configure logging
-logging.basicConfig(filename='..\logs\.log',
+logging.basicConfig(filename='..\logs\exchange.log',
                     level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -17,7 +16,7 @@ logger = logging.getLogger(__name__)
 # load database connection variables and connect to database
 def connectDB() -> tuple:
     logger.info("connecting to database...")
-    with open('..\conn.yaml', 'r') as file:
+    with open('../ExchangeRatePipeline/conn.yaml', 'r') as file:
         config = yaml.safe_load(file)
 
         host = config.get('host')
@@ -39,15 +38,16 @@ def connectDB() -> tuple:
     return conn, cur
 
 
-dt = datetime.strftime(date.today(), '%Y-%m-%d')
+dt = datetime.strftime(start_date, '%Y-%m-%d') # cast the datetime object as string
 
 
 # refs
-def get_data():
+def get_data() -> dict:
     logger.info('Making a request....')
     # urls
     url_1 = f"https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@{dt}/v1/currencies/ngn.json"
     url_2 = f'https://{dt}.currency-api.pages.dev/v1/currencies/ngn.json'
+    # Adding a fallback mechanism
     try:
         resp = requests.get(url_1)
         data = resp.json()['ngn']
@@ -56,7 +56,7 @@ def get_data():
 
         return data
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
-        logger.info(f"{url_1} bad, switching to {url_2}")
+        logger.info(f"{url_1} bad, switching to {url_2} - {e}")
         resp = requests.get(url_2)
         data = resp.json()['ngn']
 
@@ -65,10 +65,9 @@ def get_data():
         return data
 
 
-def extract_store_rate(data, connection, cursor):
+def extract_store_rate(data, connection, cursor) -> None:
     logger.info("Extracting data from api response...")
-    rates = data['ngn']
-    for k, v in rates.items():
+    for k, v in data.items():
         query = """
         INSERT INTO exchange_rate_ngn(curr_code, rate, ex_date) 
         VALUES (%s, %s, %s)
@@ -79,15 +78,14 @@ def extract_store_rate(data, connection, cursor):
 
         # save the data
         connection.commit()
-        # close the connection
-        cursor.close()
-        connection.close()
+    # close the connection
+    cursor.close()
+    connection.close()
 
 
 def main():
     conn, curr = connectDB()
     rates_data = get_data()
-    print(rates_data)
     extract_store_rate(data=rates_data, connection=conn, cursor=curr)
 
 
